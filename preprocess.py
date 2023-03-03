@@ -16,8 +16,12 @@ import data_loader
 ftype = torch.cuda.FloatTensor
 ltype = torch.cuda.LongTensor
 
+dataset_name = 'meituan_big'  # 
+
 # Data loading params
-train_file = "../dataset/loc-gowalla_totalCheckins.txt"
+# train_file = "../dataset/loc-gowalla_totalCheckins.txt"
+train_file = f"/home/hadoop-aipnlp/dolphinfs/hdd_pool/data/chihuixuan/MT-git/data/{dataset_name}/ml_{dataset_name}_st.csv"
+# train_file = "/home/hadoop-aipnlp/dolphinfs/hdd_pool/data/chihuixuan/DATA4HOPE/local-tgn/data/gowalla/loc-gowalla_totalCheckins.txt"
 
 # Model Hyperparameters
 dim = 13    # dimensionality
@@ -37,7 +41,7 @@ evaluate_every = 1
 # ===========================================================
 # Load data
 print("Loading data...")
-user_cnt, poi2id, train_user, train_time, train_lati, train_longi, train_loc, valid_user, valid_time, valid_lati, valid_longi, valid_loc, test_user, test_time, test_lati, test_longi, test_loc = data_loader.load_data(train_file)
+user_cnt, poi2id, train_user, train_time, train_lati, train_longi, train_loc, valid_user, valid_time, valid_lati, valid_longi, valid_loc, test_user, test_time, test_lati, test_longi, test_loc = data_loader.load_data(train_file, dataset_name)
 
 #np.save("poi2id_30", poi2id)
 print("User/Location: {:d}/{:d}".format(user_cnt, len(poi2id)))
@@ -97,9 +101,9 @@ class STRNNModule(nn.Module):
         f.write(data)
         data = ','.join(str(e) for e in ld.data.cpu().numpy())+"\t"
         f.write(data)
-        data = ','.join(str(e.data.cpu().numpy()[0]) for e in locs[w_cap:idx])+"\t"
+        data = ','.join(str(e.data.cpu().numpy()) for e in locs[w_cap:idx])+"\t"
         f.write(data)
-        data = str(locs[idx].data.cpu().numpy()[0])+"\n"
+        data = str(locs[idx].data.cpu().numpy())+"\n"
         f.write(data)
 
     # get transition matrices by linear interpolation
@@ -139,8 +143,8 @@ def run(user, time, lati, longi, loc, step):
 ###############################################################################################
 strnn_model = STRNNModule().cuda()
 
-print "Making train file..."
-f = open("./prepro_train_%s.txt"%lw_time, 'w')
+print("Making train file...")
+f = open(f"./prepro_train_{dataset_name}.txt", 'w')
 # Training
 train_batches = list(zip(train_time, train_lati, train_longi, train_loc))
 for j, train_batch in enumerate(tqdm.tqdm(train_batches, desc="train")):
@@ -148,17 +152,17 @@ for j, train_batch in enumerate(tqdm.tqdm(train_batches, desc="train")):
     run(train_user[j], batch_time, batch_lati, batch_longi, batch_loc, step=1)
 f.close()
 
-print "Making valid file..."
-f = open("./prepro_valid_%s.txt"%lw_time, 'w')
-# Eavludating
-valid_batches = list(zip(valid_time, valid_lati, valid_longi, valid_loc))
-for j, valid_batch in enumerate(tqdm.tqdm(valid_batches, desc="valid")):
-    batch_time, batch_lati, batch_longi, batch_loc = valid_batch#inner_batch)
-    run(valid_user[j], batch_time, batch_lati, batch_longi, batch_loc, step=2)
-f.close()
+# print("Making valid file...")
+# f = open(f"./prepro_valid_{dataset_name}.txt", 'w')
+# # Eavludating
+# valid_batches = list(zip(valid_time, valid_lati, valid_longi, valid_loc))
+# for j, valid_batch in enumerate(tqdm.tqdm(valid_batches, desc="valid")):
+#     batch_time, batch_lati, batch_longi, batch_loc = valid_batch#inner_batch)
+#     run(valid_user[j], batch_time, batch_lati, batch_longi, batch_loc, step=2)
+# f.close()
 
-print "Making test file..."
-f = open("./prepro_test_%s.txt"%lw_time, 'w')
+print("Making test file...")
+f = open(f"./prepro_test_{dataset_name}.txt", 'w')
 # Testing
 test_batches = list(zip(test_time, test_lati, test_longi, test_loc))
 for j, test_batch in enumerate(tqdm.tqdm(test_batches, desc="test")):

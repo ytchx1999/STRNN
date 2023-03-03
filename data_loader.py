@@ -1,6 +1,7 @@
 import numpy as np
 from datetime import datetime
 import pandas as pd
+from collections import defaultdict
 
 def treat_prepro(train, step):
     train_f = open(train, 'r')
@@ -26,7 +27,8 @@ def treat_prepro(train, step):
 
     for i, line in enumerate(lines):
         tokens = line.strip().split('\t')
-        if len(tokens) < 3:
+        # tokens = line.strip().split(',')
+        if len(tokens) < 3:  # 3
             if user_td: 
                 train_user.append(user)
                 train_td.append(user_td)
@@ -57,7 +59,7 @@ def treat_prepro(train, step):
 
     return train_user, train_td, train_ld, train_loc, train_dst
 
-def load_data(train):
+def load_data(train, dataset_name='gowalla'):
     user2id = {}
     poi2id = {}
 
@@ -84,13 +86,19 @@ def load_data(train):
     user_lati = []
     user_longi = []
     user_loc = []
-    visit_thr = 30
+    visit_thr = 5
 
-    prev_user = int(lines[0].split('\t')[0])
+    # prev_user = int(lines[0].split('\t')[0])
+    prev_user = int(lines[1].split(',')[1])
     visit_cnt = 0
     for i, line in enumerate(lines):
-        tokens = line.strip().split('\t')
-        user = int(tokens[0])
+        if i == 0:
+            continue
+        # tokens = line.strip().split('\t')
+        tokens = line.strip().split(',')
+        user = int(tokens[1])
+        # if user not in user2id:
+        #     user2id[user] = len(user2id)
         if user==prev_user:
             visit_cnt += 1
         else:
@@ -102,19 +110,29 @@ def load_data(train):
     train_f = open(train, 'r')
     lines = train_f.readlines()
 
-    prev_user = int(lines[0].split('\t')[0])
+    # prev_user = int(lines[0].split('\t')[0])
+    prev_user = int(lines[1].split(',')[1])
+    prev_user = user2id.get(prev_user)
     for i, line in enumerate(lines):
-        tokens = line.strip().split('\t')
-        user = int(tokens[0])
+        if i == 0:
+            continue
+        # tokens = line.strip().split('\t')
+        tokens = line.strip().split(',')
+        user = int(tokens[1])
         if user2id.get(user) is None:
             continue
         user = user2id.get(user)
 
-        time = (datetime.strptime(tokens[1], "%Y-%m-%dT%H:%M:%SZ")\
-                -datetime(2009,1,1)).total_seconds()/60  # minutes
-        lati = float(tokens[2])
-        longi = float(tokens[3])
-        location = int(tokens[4])
+        # time = (datetime.strptime(tokens[1], "%Y-%m-%dT%H:%M:%SZ")\
+        #         -datetime(2009,1,1)).total_seconds()/60  # minutes
+        # 1230739200 -- 2009-1-1
+        time = (float(tokens[3]) - 1230739200.0) / 60.0  # minutes
+        # lati = float(tokens[2])
+        # longi = float(tokens[3])
+        # location = int(tokens[4])
+        lati = float(tokens[4])
+        longi = float(tokens[5])
+        location = int(tokens[2])
         if poi2id.get(location) is None:
             poi2id[location] = len(poi2id)
         location = poi2id.get(location)
@@ -125,8 +143,14 @@ def load_data(train):
             user_longi.insert(0, longi)
             user_loc.insert(0, location)
         else:
-            train_thr = int(len(user_time) * 0.7)
-            valid_thr = int(len(user_time) * 0.8)
+            if dataset_name in ['gowalla', 'meituan_big']:
+                train_thr = int(len(user_time) * 0.8)
+                valid_thr = int(len(user_time) * 0.9)
+            # elif dataset_name == 'meituan_big':
+            #     train_thr = int(len(user_time) * 0.7137918444125029)
+            #     valid_thr = int(len(user_time) * 0.8570053042592756)
+            # train_thr = int(len(user_time) * 0.7)
+            # valid_thr = int(len(user_time) * 0.8)
             train_user.append(user)
             train_time.append(user_time[:train_thr])
             train_lati.append(user_lati[:train_thr])
@@ -150,8 +174,11 @@ def load_data(train):
             user_loc = [location]
 
     if user2id.get(user) is not None:
-        train_thr = int(len(user_time) * 0.7)
-        valid_thr = int(len(user_time) * 0.8)
+        if dataset_name in ['gowalla', 'meituan_big']:
+            train_thr = int(len(user_time) * 0.8)
+            valid_thr = int(len(user_time) * 0.9)
+        # train_thr = int(len(user_time) * 0.7)
+        # valid_thr = int(len(user_time) * 0.8)
         train_user.append(user)
         train_time.append(user_time[:train_thr])
         train_lati.append(user_lati[:train_thr])

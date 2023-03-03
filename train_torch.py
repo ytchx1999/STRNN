@@ -16,13 +16,15 @@ import data_loader
 ftype = torch.cuda.FloatTensor
 ltype = torch.cuda.LongTensor
 
+dataset_name = 'meituan_big'
+
 # Data loading params
-train_file = "./prepro_train_50.txt"
-valid_file = "./prepro_valid_50.txt"
-test_file = "./prepro_test_50.txt"
+train_file = f"./prepro_train_{dataset_name}.txt"
+valid_file = f"./prepro_valid_{dataset_name}.txt"
+test_file = f"./prepro_test_{dataset_name}.txt"
 
 # Model Hyperparameters
-dim = 13    # dimensionality
+dim = 13   # dimensionality
 ww = 360  # winodw width (6h)
 up_time = 560632.0  # min
 lw_time = 0.
@@ -31,15 +33,21 @@ lw_dist = 0.
 reg_lambda = 0.1
 
 # Training Parameters
-batch_size = 2
-num_epochs = 30
+batch_size = 10
+num_epochs = 5
 learning_rate = 0.001
 momentum = 0.9
 evaluate_every = 1
 h_0 = Variable(torch.randn(dim, 1), requires_grad=False).type(ftype)
 
-user_cnt = 32899 #50 #107092#0
-loc_cnt = 1115406 #50 #1280969#0
+# gowalla 12424/26588
+# meituan_big 17683/8374
+# user_cnt = 12425
+# loc_cnt = 26589
+user_cnt = 17684
+loc_cnt = 8375
+# user_cnt = 32899 #50 #107092#0
+# loc_cnt = 1115406 #50 #1280969#0
 #user_cnt = 42242 #30
 #loc_cnt = 1164559 #30
 
@@ -53,7 +61,7 @@ except NameError:
 # Load data
 print("Loading data...")
 train_user, train_td, train_ld, train_loc, train_dst = data_loader.treat_prepro(train_file, step=1)
-valid_user, valid_td, valid_ld, valid_loc, valid_dst = data_loader.treat_prepro(valid_file, step=2)
+# valid_user, valid_td, valid_ld, valid_loc, valid_dst = data_loader.treat_prepro(valid_file, step=2)
 test_user, test_td, test_ld, test_loc, test_dst = data_loader.treat_prepro(test_file, step=3)
 
 print("User/Location: {:d}/{:d}".format(user_cnt, loc_cnt))
@@ -123,10 +131,13 @@ def print_score(batches, step):
     recall1 = 0.
     recall5 = 0.
     recall10 = 0.
-    recall100 = 0.
+    recall20 = 0.
     recall1000 = 0.
     recall10000 = 0.
     iter_cnt = 0
+
+    ndcg10 = 0.
+    ndcg20 = 0.
 
     for batch in tqdm.tqdm(batches, desc="validation"):
         batch_user, batch_td, batch_ld, batch_loc, batch_dst = batch
@@ -135,19 +146,28 @@ def print_score(batches, step):
         iter_cnt += 1
         batch_o, target = run(batch_user, batch_td, batch_ld, batch_loc, batch_dst, step=step)
 
+        rank = np.where(batch_o == target)[0][0]
+
+        if rank < 10:
+            ndcg10 += 1 / np.log2(rank + 2)
+        if rank < 20:
+            ndcg20 += 1 / np.log2(rank + 2)
+
         recall1 += target in batch_o[:1]
         recall5 += target in batch_o[:5]
         recall10 += target in batch_o[:10]
-        recall100 += target in batch_o[:100]
+        recall20 += target in batch_o[:20]
         recall1000 += target in batch_o[:1000]
         recall10000 += target in batch_o[:10000]
 
-    print("recall@1: ", recall1/iter_cnt)
-    print("recall@5: ", recall5/iter_cnt)
+    # print("recall@1: ", 10 * recall1/iter_cnt)
+    # print("recall@5: ", 10 * recall5/iter_cnt)
     print("recall@10: ", recall10/iter_cnt)
-    print("recall@100: ", recall100/iter_cnt)
-    print("recall@1000: ", recall1000/iter_cnt)
-    print("recall@10000: ", recall10000/iter_cnt)
+    print("recall@20: ", recall20/iter_cnt)
+    print("NDCG@10: ", ndcg10/iter_cnt)
+    print("NDCG@20: ", ndcg20/iter_cnt)
+    # print("recall@1000: ", 10 * recall1000/iter_cnt)
+    # print("recall@10000: ", 10 * recall10000/iter_cnt)
 
 ###############################################################################################
 def run(user, td, ld, loc, dst, step):
@@ -206,8 +226,10 @@ for i in xrange(num_epochs):
     if (i+1) % evaluate_every == 0:
         print("==================================================================================")
         #print("Evaluation at epoch #{:d}: ".format(i+1)), total_loss/j, datetime.datetime.now()
-        valid_batches = list(zip(valid_user, valid_td, valid_ld, valid_loc, valid_dst))
-        print_score(valid_batches, step=2)
+        # valid_batches = list(zip(valid_user, valid_td, valid_ld, valid_loc, valid_dst))
+        # print_score(valid_batches, step=2)
+        test_batches = list(zip(test_user, test_td, test_ld, test_loc, test_dst))
+        print_score(test_batches, step=3)
 
 # Testing
 print("Training End..")
